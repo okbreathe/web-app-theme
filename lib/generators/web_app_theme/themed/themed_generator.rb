@@ -75,11 +75,14 @@ module WebAppTheme
     # If the (Active Record) #columns method does not exist, it attempts to
     # perform the (Mongoid) #fields method instead
     def columns
-      begin
-        excluded_column_names = %w[id created_at updated_at]
-        Kernel.const_get(@model_name).columns.reject{|c| excluded_column_names.include?(c.name) }.collect{|c| Rails::Generators::GeneratedAttribute.new(c.name, c.type)} 
-      rescue NoMethodError
-        Kernel.const_get(@model_name).fields.collect{|c| c[1]}.reject{|c| excluded_column_names.include?(c.name) }.collect{|c| Rails::Generators::GeneratedAttribute.new(c.name, c.type.to_s)}
+      excluded_column_names = %w[id created_at updated_at]
+      model = Kernel.const_get(@model_name)
+      if Kernel.const_defined?("ActiveRecord") && model.ancestors.include?( ::ActiveRecord::Base )
+        model.columns.reject{|c| excluded_column_names.include?(c.name) }.map{|c| Rails::Generators::GeneratedAttribute.new(c.name, c.type)}
+      elsif Kernel.const_defined?("DataMapper") && model.ancestors.include?( ::DataMapper::Resource )
+        model.properties.reject{|c| excluded_column_names.include?(c.name) }.map{|c| Rails::Generators::GeneratedAttribute.new(c.name.to_s, c.primitive.to_s.underscore.to_sym) }
+      else
+        model.fields.map{|c| c[1]}.reject{|c| excluded_column_names.include?(c.name) }.map{|c| Rails::Generators::GeneratedAttribute.new(c.name, c.type.to_s)}
       end
     end
     
